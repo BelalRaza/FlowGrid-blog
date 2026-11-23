@@ -1,0 +1,73 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Publishing the FlowGrid Technical Series</title><link rel="stylesheet" href="assets/style.css"></head><body><nav aria-label="Series navigation"><a class="brand" href="index.html">FLOWGRID / TECHNICAL SERIES</a><a href="phase-1.html">Part 1</a><a href="phase-2.html">Part 2</a><a href="phase-3.html">Part 3</a><a href="technical-review.html">Technical review</a></nav><main><article><h1>Publishing the FlowGrid Technical Series</h1>
+<p>Open <code>index.html</code> to read all three formatted articles and view the separate figures. Each article also has an editable Markdown source.</p>
+<h2>Article order</h2>
+<ol>
+<li>Building FlowGrid from API Request to Background Worker.</li>
+<li>Making FlowGrid Jobs Recover from Crashes and Retries.</li>
+<li>Adding Workflow Orchestration Scheduling and Live Monitoring to FlowGrid.</li>
+</ol>
+<p>The drafts preserve the three implementation milestones. Phase 1 and Phase 2 describe the behavior at those milestones; Phase 3 describes the completed repository. The technical review is an author note, separate from the publication copy.</p>
+<h2>Moving the copy into an editor</h2>
+<p>Use the rendered HTML article as the reading and copying source, and keep its Markdown file for editing. Set the article title and subtitle in the destination editor. Review heading levels, inline code, and Python, SQL, and JSON blocks after pasting; destination editors may handle rich text differently.</p>
+<p>Upload each corresponding PNG where its figure appears. Keep the caption immediately below it and use the descriptive alt text from the Markdown image line. PNG is the upload copy; SVG is the editable master.</p>
+<p>The local preview links between the articles are navigation aids. Once articles are published, add their actual published URLs to connect the series. No repository URL or publication URL has been invented.</p>
+<h2>Figure placement</h2>
+<table>
+<thead>
+<tr>
+<th>Article</th>
+<th>Figure</th>
+<th>Upload file</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Part 1</td>
+<td>Architecture</td>
+<td><code>assets/images/01-phase-1-architecture.png</code></td>
+</tr>
+<tr>
+<td>Part 1</td>
+<td>Initial state machine</td>
+<td><code>assets/images/02-phase-1-state-machine.png</code></td>
+</tr>
+<tr>
+<td>Part 2</td>
+<td>Retry lifecycle</td>
+<td><code>assets/images/03-phase-2-recovery.png</code></td>
+</tr>
+<tr>
+<td>Part 2</td>
+<td>Attempt fencing</td>
+<td><code>assets/images/04-phase-2-attempt-fencing.png</code></td>
+</tr>
+<tr>
+<td>Part 3</td>
+<td>Workflow DAG</td>
+<td><code>assets/images/05-phase-3-workflow-dag.png</code></td>
+</tr>
+<tr>
+<td>Part 3</td>
+<td>Cron transactions</td>
+<td><code>assets/images/06-phase-3-cron-transactions.png</code></td>
+</tr>
+<tr>
+<td>Part 3</td>
+<td>Live event flow</td>
+<td><code>assets/images/07-phase-3-live-events.png</code></td>
+</tr>
+<tr>
+<td>Part 3</td>
+<td>Recorded throughput</td>
+<td><code>assets/images/08-phase-3-throughput.png</code></td>
+</tr>
+</tbody></table>
+<h2>Suggested tags</h2>
+<p>These are editorial suggestions, independent of any destination&#39;s current tag limits.</p>
+<ul>
+<li>Part 1: Python, FastAPI, Celery, PostgreSQL, Backend Development.</li>
+<li>Part 2: Distributed Systems, Reliability, Idempotency, Python, Backend Development.</li>
+<li>Part 3: Workflow Orchestration, Distributed Systems, PostgreSQL, Prometheus, Python.</li>
+</ul>
+<h2>Evidence to retain</h2>
+<p>The technical review records corrected claims, source locations, and fresh SQLite test results. Preserve the distinction between those fresh checks and the historical PostgreSQL, smoke, chaos, and benchmark runs quoted in the articles. Any future performance claim should identify its workload, worker count, hardware, and measurement date in the same way.</p>
+</article></main><footer>FlowGrid technical series · Prepared from the project build logs · November 2026</footer></body></html>

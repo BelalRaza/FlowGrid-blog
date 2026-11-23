@@ -1,0 +1,177 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FlowGrid Technical Review and Validation</title><link rel="stylesheet" href="assets/style.css"></head><body><nav aria-label="Series navigation"><a class="brand" href="index.html">FLOWGRID / TECHNICAL SERIES</a><a href="phase-1.html">Part 1</a><a href="phase-2.html">Part 2</a><a href="phase-3.html">Part 3</a><a href="technical-review.html">Technical review</a></nav><main><article><h1>FlowGrid Technical Review and Validation</h1>
+<p>Reviewed November 23, 2026. This note is for the author; the three article files contain the publication copy.</p>
+<h2>Scope and source snapshots</h2>
+<p>The review covered the supplied project README and three phase posts, then traced their principal claims through the implementation, tests, Compose configuration, and recorded benchmark results. The original repository and source posts were left unchanged.</p>
+<p>The repository was clean when checked. Its milestones are:</p>
+<ul>
+<li>Phase 1: <code>24fea3f</code> — Working product.</li>
+<li>Phase 2: <code>5005b30</code> — Reliability.</li>
+<li>Phase 3: <code>3435daf</code> — Advanced system design; the current HEAD reviewed.</li>
+</ul>
+<p>The three committed snapshots were extracted into isolated working directories. Tests used the existing Python 3.11.13 environment with Celery 5.7.0 and SQLAlchemy 2.0.58. These are fresh checks of historical source using the available environment, rather than reproductions of each milestone&#39;s original dependency installation.</p>
+<h2>Fresh automated checks</h2>
+<table>
+<thead>
+<tr>
+<th>Snapshot</th>
+<th>SQLite result</th>
+<th>Exit code</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Phase 1</td>
+<td>30 passed</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Phase 2</td>
+<td>80 passed</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Phase 3</td>
+<td>121 passed, 1 skipped</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<p>The skipped test requires PostgreSQL LISTEN/NOTIFY. Tests use Celery eager execution and a throwaway SQLite database, and do not exercise a real Redis transport or worker process. The environment emitted a Starlette/httpx deprecation warning without failing the suites.</p>
+<p>The recorded PostgreSQL counts, migrations, smoke checks, chaos scenarios, browser observations, and throughput numbers were checked for consistency with the repository material. They were not rerun in this review. The articles identify those results as milestone build-log observations.</p>
+<h2>Technical corrections applied to the articles</h2>
+<table>
+<thead>
+<tr>
+<th>Original claim or implication</th>
+<th>Correct treatment</th>
+<th>Implementation or primary reference</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Killing a worker necessarily loses a Celery countdown retry</td>
+<td>ETA tasks can occupy worker memory, but acknowledgement and Redis redelivery behavior matter. Database scheduling is justified by visibility and explicit reconciliation.</td>
+<td>Celery calling guide linked below; <code>app/services/retry.py</code>; sweeper release path</td>
+</tr>
+<tr>
+<td>Crash recovery is bounded by timeout plus 15 seconds</td>
+<td>That is the lease deadline measured from claim. Sweep delay, retry backoff, broker availability, queue wait, and replacement runtime also affect completion.</td>
+<td><code>app/services/jobs.py:383</code>; <code>app/services/sweeper.py:58</code></td>
+</tr>
+<tr>
+<td>An expired lease proves a worker is dead</td>
+<td>Expiry is a recovery decision. A paused worker may resume; the outcome fence protects against stale authority.</td>
+<td><code>app/services/jobs.py:448</code> and <code>:468</code></td>
+</tr>
+<tr>
+<td>Exactly one cron target exists for every tick under all failures</td>
+<td>Successful target creation commits atomically with the schedule advance. The exception handler advances separately and can skip a tick without a target. This is distinct from execution count.</td>
+<td><code>app/services/schedules.py:118</code>, especially <code>:148</code></td>
+</tr>
+<tr>
+<td>Every leftover Kahn node belongs to a cycle</td>
+<td>Leftovers can also include nodes downstream of a cycle.</td>
+<td><code>app/services/workflows.py:84</code></td>
+</tr>
+<tr>
+<td>All workflow errors, including cycles, always return together</td>
+<td>Structural and payload problems are collected. Cycle detection runs only if those checks produced no errors.</td>
+<td><code>app/services/workflows.py:147</code></td>
+</tr>
+<tr>
+<td>The DAG concurrency test exercises competing transactions</td>
+<td>It invokes <code>advance_run</code> twice sequentially in one session. It establishes repeat-call behavior, not a threaded/database concurrency test.</td>
+<td><code>tests/test_workflows.py:197</code>, calls at <code>:206</code> and <code>:207</code></td>
+</tr>
+<tr>
+<td>A committed event always describes the current database row</td>
+<td>NOTIFY follows commit, but the row can advance again before a client receives it. Events are refresh hints.</td>
+<td><code>app/db/triggers.py</code>; PostgreSQL NOTIFY reference below</td>
+</tr>
+<tr>
+<td>Hundreds of streams need only one database connection in total</td>
+<td>The listener is shared per API process. REST requests, initial authentication, and periodic revocation checks still use connections.</td>
+<td><code>app/services/events.py</code>; <code>app/api/events.py:53</code></td>
+</tr>
+<tr>
+<td>Every database update emits a live event</td>
+<td>The trigger emits for inserts and selected status or attempt changes. Ordinary unrelated field updates need not notify.</td>
+<td><code>app/db/triggers.py</code></td>
+</tr>
+<tr>
+<td>Notifications were actually sent</td>
+<td>The handler inserts deduplicated notification rows. There is no real delivery integration. <code>notifications_sent</code> counts new rows.</td>
+<td><code>app/tasks/handlers.py:228</code></td>
+</tr>
+<tr>
+<td>Request idempotency expires precisely at 24 hours</td>
+<td>The sweeper removes rows older than the TTL. Until deletion, the existing record can continue to match.</td>
+<td><code>app/services/sweeper.py:187</code>; <code>app/services/jobs.py</code></td>
+</tr>
+<tr>
+<td>A stale queued job is republished at most once per interval across all sweepers</td>
+<td>Timestamp refresh reduces repeated publication by a sweeper; the publish occurs before the guarded timestamp update, so competing sweepers may both publish.</td>
+<td><code>app/services/sweeper.py:141</code></td>
+</tr>
+<tr>
+<td>Queue republish always uses a 300-second threshold</td>
+<td>300 seconds is the application default. Compose sets 60 seconds.</td>
+<td><code>app/core/config.py</code>; <code>docker-compose.yml:11</code></td>
+</tr>
+<tr>
+<td>The 1 MB request limit covers every body</td>
+<td>It is a 1,000,000-byte Content-Length check, not a streaming cap on uploads without that header.</td>
+<td><code>app/core/middleware.py:62</code></td>
+</tr>
+<tr>
+<td>Every handler runs without holding a database connection</td>
+<td>The executor closes its claim session before invoking a handler. The record-processing handler opens its own session for effects. The article narrows the claim to executor transactions.</td>
+<td><code>app/services/executor.py</code>; <code>app/tasks/handlers.py:236</code></td>
+</tr>
+<tr>
+<td>Slower no-op scaling proves PostgreSQL is the bottleneck</td>
+<td>The shared-VM measurements show sublinear scaling; they do not isolate the limiting component.</td>
+<td><code>docs/benchmarks/phase-3-results.md</code>; <code>scripts/benchmark.py</code></td>
+</tr>
+<tr>
+<td>Phase 1 publication exceptions prove no message was delivered</td>
+<td>A broker error can be ambiguous. The FAILED transition is guarded by PENDING and cannot overwrite a worker that already advanced the row.</td>
+<td>Phase 1 <code>app/services/jobs.py:63</code></td>
+</tr>
+</tbody></table>
+<h2>Recorded benchmark consistency</h2>
+<p>The benchmark artifact is dated November 20, 2026, at 22:15 UTC. All services share an eight-CPU Docker VM; each worker container has two processes.</p>
+<table>
+<thead>
+<tr>
+<th>Worker containers</th>
+<th>No-op jobs per second</th>
+<th>Simulated I/O jobs per second</th>
+<th>I/O p50 / p95 completion seconds</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>256.6</td>
+<td>9.1</td>
+<td>22.17 / 41.94</td>
+</tr>
+<tr>
+<td>2</td>
+<td>396.0</td>
+<td>17.9</td>
+<td>11.31 / 21.26</td>
+</tr>
+<tr>
+<td>4</td>
+<td>466.2</td>
+<td>35.2</td>
+<td>5.82 / 10.89</td>
+</tr>
+</tbody></table>
+<p>The total workload is <code>(1,000 + 400) × 3 = 4,200</code> jobs. Ideal simulated-I/O throughput is 10, 20, and 40 jobs per second. The measured efficiencies are 91.0%, 89.5%, and 88.0%. The article uses the artifact&#39;s unrounded no-op values and labels the run as a local measurement.</p>
+<h2>Primary documentation consulted</h2>
+<p>The revised ETA discussion follows the <a href="https://docs.celeryq.dev/en/stable/userguide/calling.html#eta-and-countdown">Celery ETA and countdown documentation</a>.</p>
+<p>The state-transition and sibling-completion explanations use <a href="https://www.postgresql.org/docs/16/transaction-iso.html">PostgreSQL 16 transaction isolation</a>, matching the repository&#39;s PostgreSQL 16 Compose image.</p>
+<p>The event-delivery wording follows <a href="https://www.postgresql.org/docs/16/sql-notify.html">PostgreSQL 16 NOTIFY semantics</a>. The browser API boundary was checked against the <a href="https://html.spec.whatwg.org/multipage/server-sent-events.html#the-eventsource-interface">HTML EventSource interface</a>.</p>
+<h2>Publication and artifact checks</h2>
+<p>Each article has a title, subtitle, explanatory prose, selected code, image placements, captions, and alt text. The figures are supplied as 2400-pixel-wide PNGs for upload, plus editable SVGs. The benchmark uses separate scales for no-op and simulated-I/O throughput.</p>
+<p>The HTML copies and local article links were checked for readability, missing assets, horizontal overflow, and formatting. The figures were rendered and visually inspected. No content was uploaded to Medium.</p>
+</article></main><footer>FlowGrid technical series · Prepared from the project build logs · November 2026</footer></body></html>
